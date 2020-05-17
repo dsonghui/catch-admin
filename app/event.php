@@ -14,5 +14,6 @@ return [
     ],
 
     'subscribe' => [
+        'TestSub' => \app\subscribe\TestSub::class,
     ],
 ];
