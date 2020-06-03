@@ -9,4 +9,6 @@
 // | Author: liu21st <liu21st@gmail.com>
 // +----------------------------------------------------------------------
 
+use think\facade\Route;
 
+Route::get('istest','Index/hello'); // 定义GET请求路由规则

@@ -11,6 +11,7 @@
 
 namespace catchAdmin\xiaoqu\controller;
 
+use catcher\CatchAuth;
 use think\Request;
 use catcher\CatchResponse;
 use catcher\base\CatchController;
@@ -44,9 +45,13 @@ class XiaoQu extends CatchController
      * @param Request Request
      * @return \think\Response
      */
-    public function save(Request $request)
+    public function save(Request $request, CatchAuth $auth)
     {
-        return CatchResponse::success($this->model->storeBy($request->post()));
+        $user = $auth->user();
+        $post = $request->post();
+        $post['shou_zi_mu'] = '';
+        $post['creator_id'] = $user->id;
+        return CatchResponse::success($this->model->storeBy($post));
     }
 
     /**
