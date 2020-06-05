@@ -1,21 +1,13 @@
 <?php
-// +----------------------------------------------------------------------
-// | CatchAdmin [Just Like ～ ]
-// +----------------------------------------------------------------------
-// | Copyright (c) 2017~2020 http://catchadmin.com All rights reserved.
-// +----------------------------------------------------------------------
-// | Licensed ( https://github.com/yanwenwu/catch-admin/blob/master/LICENSE.txt )
-// +----------------------------------------------------------------------
-// | Author: JaguarJack [ njphper@gmail.com ]
-// +----------------------------------------------------------------------
 
 namespace catchAdmin\xiaoqu\controller;
 
 use catcher\CatchAuth;
+use catcher\Utils;
 use think\Request;
 use catcher\CatchResponse;
 use catcher\base\CatchController;
-use catchAdmin\xiaoqu\model\xiaoqu as XiaoQuModel;
+use catchAdmin\xiaoqu\model\XiaoQu as XiaoQuModel;
 
 class XiaoQu extends CatchController
 {
@@ -49,7 +41,7 @@ class XiaoQu extends CatchController
     {
         $user = $auth->user();
         $post = $request->post();
-        $post['shou_zi_mu'] = '';
+        $post['shou_zi_mu'] = $post['shou_zi_mu'] ?? '';
         $post['creator_id'] = $user->id;
         return CatchResponse::success($this->model->storeBy($post));
     }
@@ -87,8 +79,18 @@ class XiaoQu extends CatchController
      */
     public function delete($id)
     {
-        return CatchResponse::success($this->model->deleteBy($id));
+
+        $ids = Utils::stringToArrayBy($id);
+
+        foreach ($ids as $_id) {
+            $this->model->deleteBy($_id);
+        }
+        return CatchResponse::success();
     }
 
+    public function getAll()
+    {
+        return CatchResponse::success($this->model->field(['id', 'name'])->select());
+    }
 
 }
