@@ -10,7 +10,11 @@ use League\Fractal\TransformerAbstract;
 
 class BaseTransformer extends TransformerAbstract
 {
-
-
+    /**
+     * @return array
+     */
+    public function transform($collect) {
+        return $collect->toArray();
+    }
 
 }

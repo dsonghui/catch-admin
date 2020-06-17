@@ -27,8 +27,9 @@
         "overtrue/wechat": "^4.2",
          "ext-json": "*",
         "jaguarjack/migration-generator": "dev-master",
-      "ext-zip": "*",
-        "phpoffice/phpspreadsheet": "^1.12"
+        "ext-zip": "*",
+        "phpoffice/phpspreadsheet": "^1.12",
+        "league/fractal": "^0.18.0"
     },
     "require-dev": {
         "symfony/var-dumper": "^4.2",

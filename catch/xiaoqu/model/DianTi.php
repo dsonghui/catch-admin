@@ -35,6 +35,10 @@ class DianTi extends Model
         'deleted_at', // 删除状态，null 未删除 timestamp 已删除
     ];
 
+    public function xiaoqu() {
+        return $this->belongsTo(XiaoQu::class, 'xiaoqu_id', 'id');
+    }
+
     /**
      * 列表
      *

@@ -11,4 +11,10 @@
 
 use think\facade\Route;
 
-Route::get('istest','Index/hello'); // 定义GET请求路由规则
+Route::get('istest', 'Index/hello'); // 定义GET请求路由规则
+
+Route::group('api', function () {
+    Route::rule('xiaoqu', 'api.ApiXiaoQu/index');
+    Route::rule('xiaoqu/:id', 'api.ApiXiaoQu/info');
+    Route::rule('dianti/:id', 'api.ApiDianTi/index');
+});

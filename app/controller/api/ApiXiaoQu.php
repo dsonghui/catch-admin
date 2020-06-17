@@ -1,15 +1,14 @@
 <?php
 
-namespace app\controller;
+namespace app\controller\api;
 
 use app\BaseController;
 use app\common\traits\ResponderTrait;
-use app\model\Jobs;
 use app\transformers\BaseTransformer;
 use catchAdmin\xiaoqu\model\DianTi;
 use catchAdmin\xiaoqu\model\XiaoQu;
 
-class Index extends BaseController
+class ApiXiaoQu extends BaseController
 {
     use ResponderTrait;
 
@@ -18,7 +17,8 @@ class Index extends BaseController
         return $this->responseCollection($dianti, new BaseTransformer());
     }
 
-    public function hello($name = 'ThinkPHP6') {
-        return $name;
+    public function info($id) {
+        $dianti = XiaoQu::where('id', '=', $id)->with('diantis')->find();
+        return $this->responseItem($dianti, new BaseTransformer());
     }
 }

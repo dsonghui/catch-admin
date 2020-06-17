@@ -34,6 +34,10 @@ class XiaoQu extends Model
         'deleted_at', // 删除状态，null 未删除 timestamp 已删除
     ];
 
+    public function diantis() {
+        return $this->hasMany(DianTi::class, 'xiaoqu_id', 'id');
+    }
+
     /**
      * 列表
      *
@@ -42,8 +46,7 @@ class XiaoQu extends Model
      * @return \think\Paginator
      * @throws \think\db\exception\DbException
      */
-    public function getList()
-    {
+    public function getList() {
         return $this->catchSearch()
             ->paginate();
     }
