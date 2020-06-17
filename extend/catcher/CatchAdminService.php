@@ -14,6 +14,7 @@ use catcher\command\ModuleCacheCommand;
 use catcher\command\SeedRunCommand;
 use catcher\command\Tools\ExportDataCommand;
 use catcher\command\Tools\MakeMenuCommand;
+use catcher\command\worker\ExcelTaskCommand;
 use catcher\command\worker\WsWorkerCommand;
 use think\exception\Handle;
 use think\facade\Validate;
@@ -69,6 +70,7 @@ class CatchAdminService extends Service
             WsWorkerCommand::class,
             ExportDataCommand::class,
             MakeMenuCommand::class,
+            ExcelTaskCommand::class,
             WechatCommand::class
         ]);
     }
