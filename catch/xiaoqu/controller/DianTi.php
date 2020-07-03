@@ -12,8 +12,7 @@ class DianTi extends CatchController
 {
     protected $model;
 
-    public function __construct(DianTiModel $model)
-    {
+    public function __construct(DianTiModel $model) {
         $this->model = $model;
     }
 
@@ -24,8 +23,7 @@ class DianTi extends CatchController
      *
      * @return \think\Response
      */
-    public function index()
-    {
+    public function index() {
         return CatchResponse::paginate($this->model->getList());
     }
 
@@ -36,8 +34,7 @@ class DianTi extends CatchController
      * @param Request Request
      * @return \think\Response
      */
-    public function save(Request $request)
-    {
+    public function save(Request $request) {
         return CatchResponse::success($this->model->storeBy($request->post()));
     }
 
@@ -48,8 +45,7 @@ class DianTi extends CatchController
      * @param $id
      * @return \think\Response
      */
-    public function read($id)
-    {
+    public function read($id) {
         return CatchResponse::success($this->model->findBy($id));
     }
 
@@ -60,8 +56,7 @@ class DianTi extends CatchController
      * @param Request $request
      * @return \think\Response
      */
-    public function update(Request $request, $id)
-    {
+    public function update(Request $request, $id) {
         return CatchResponse::success($this->model->updateBy($id, $request->post()));
     }
 
@@ -72,8 +67,7 @@ class DianTi extends CatchController
      * @param $id
      * @return \think\Response
      */
-    public function delete($id)
-    {
+    public function delete($id) {
         $ids = Utils::stringToArrayBy($id);
 
         foreach ($ids as $_id) {
@@ -82,5 +76,15 @@ class DianTi extends CatchController
         return CatchResponse::success($this->model->deleteBy($id));
     }
 
+
+    /**
+     * 获取电梯信息
+     */
+    public function detail(Request $request) {
+        $dianti_id = $request->input('dianti_id');
+        $dianti = $this->model->where('id',$dianti_id)->find();
+
+        //return CatchResponse::success($this->model->with('diantis')->select());
+    }
 
 }

@@ -13,8 +13,7 @@ class XiaoQu extends CatchController
 {
     protected $model;
 
-    public function __construct(XiaoQuModel $model)
-    {
+    public function __construct(XiaoQuModel $model) {
         $this->model = $model;
     }
 
@@ -25,8 +24,7 @@ class XiaoQu extends CatchController
      *
      * @return \think\Response
      */
-    public function index()
-    {
+    public function index() {
         return CatchResponse::paginate($this->model->getList());
     }
 
@@ -37,8 +35,7 @@ class XiaoQu extends CatchController
      * @param Request Request
      * @return \think\Response
      */
-    public function save(Request $request, CatchAuth $auth)
-    {
+    public function save(Request $request, CatchAuth $auth) {
         $user = $auth->user();
         $post = $request->post();
         $post['shou_zi_mu'] = $post['shou_zi_mu'] ?? '';
@@ -53,8 +50,7 @@ class XiaoQu extends CatchController
      * @param $id
      * @return \think\Response
      */
-    public function read($id)
-    {
+    public function read($id) {
         return CatchResponse::success($this->model->findBy($id));
     }
 
@@ -65,8 +61,7 @@ class XiaoQu extends CatchController
      * @param Request $request
      * @return \think\Response
      */
-    public function update(Request $request, $id)
-    {
+    public function update(Request $request, $id) {
         return CatchResponse::success($this->model->updateBy($id, $request->post()));
     }
 
@@ -77,8 +72,7 @@ class XiaoQu extends CatchController
      * @param $id
      * @return \think\Response
      */
-    public function delete($id)
-    {
+    public function delete($id) {
 
         $ids = Utils::stringToArrayBy($id);
 
@@ -88,9 +82,15 @@ class XiaoQu extends CatchController
         return CatchResponse::success();
     }
 
-    public function getAll()
-    {
+    public function getAll() {
         return CatchResponse::success($this->model->field(['id', 'name'])->select());
+    }
+
+    /**
+     * 获取所有的小区和电梯
+     */
+    public function getAll2() {
+        return CatchResponse::success($this->model->with('diantis')->select());
     }
 
 }

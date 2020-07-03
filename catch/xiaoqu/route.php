@@ -11,5 +11,7 @@
 
 $router->resource('xiaoqu', '\catchAdmin\xiaoqu\controller\XiaoQu');
 $router->get('xiaoqu/all', '\catchAdmin\xiaoqu\controller\XiaoQu@getAll');
+$router->get('xiaoqu/all2', '\catchAdmin\xiaoqu\controller\XiaoQu@getAll2');
 $router->resource('dianti', '\catchAdmin\xiaoqu\controller\DianTi');
+$router->resource('dianti_detail', '\catchAdmin\xiaoqu\controller\DianTi@detail');
 $router->get('istest', '\catchAdmin\xiaoqu\controller\IsTest@index');
