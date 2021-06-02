@@ -3,6 +3,7 @@ namespace catcher\generate\factory;
 
 use catcher\CatchAdmin;
 use catcher\exceptions\FailedException;
+use catcher\Utils;
 use JaguarJack\MigrateGenerator\MigrateGenerator;
 use think\facade\Db;
 use think\helper\Str;
@@ -10,7 +11,15 @@ use think\helper\Str;
 
 class Migration extends Factory
 {
-    public function done($params)
+    /**
+     *
+     * @time 2021年03月13日
+     * @param array $params
+     * @throws \Doctrine\DBAL\DBALException
+     * @throws \JaguarJack\MigrateGenerator\Exceptions\EmptyInDatabaseException
+     * @return string
+     */
+    public function done(array $params): string
     {
         [$module, $tableName] = $params;
 
@@ -30,7 +39,11 @@ class Migration extends Factory
 
         foreach ($tables as $table) {
             if ($table->getName() == $tableName) {
-                file_put_contents($file, $migrateGenerator->getMigrationContent($table));
+                $content = $migrateGenerator->getMigrationContent($table);
+                $noPrefix = str_replace(Utils::tablePrefix(), '', $tableName);
+                $_content = str_replace($tableName, $noPrefix, $content, $count);
+                file_put_contents($file, $count == 1 ? $_content : $content);
+
                 if (!file_exists($file)) {
                     throw new FailedException('migration generate failed');
                 }
@@ -48,6 +61,6 @@ class Migration extends Factory
             }
         }
 
-        return true;
+        return $file;
     }
 }

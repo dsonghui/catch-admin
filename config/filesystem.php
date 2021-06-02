@@ -9,8 +9,8 @@ return [
     'disks'   => [
         'local'  => [
             'type' => 'local',
-            'root' => app()->getRuntimePath() . 'storage',
-            'domain' => '',
+            'root' =>  app()->getRootPath() . 'public'.DIRECTORY_SEPARATOR.'images',
+            'domain' => env('app.domain'),
         ],
         'public' => [
             // 磁盘类型

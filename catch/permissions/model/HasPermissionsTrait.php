@@ -48,10 +48,10 @@ trait HasPermissionsTrait
    * @return mixed
    * @throws \think\db\exception\DbException
    */
-  public function attach(array $permissions)
+  public function attachPermissions(array $permissions)
   {
     if (empty($permissions)) {
-      return true;
+        return true;
     }
 
     sort($permissions);
@@ -62,15 +62,15 @@ trait HasPermissionsTrait
   /**
    *
    * @time 2019年12月08日
-   * @param array $roles
+   * @param array $permissions
    * @return mixed
    */
-  public function detach(array $roles = [])
+  public function detachPermissions(array $permissions = [])
   {
-    if (empty($roles)) {
-      return $this->permissions()->detach();
+    if (empty($permissions)) {
+        return $this->permissions()->detach();
     }
 
-    return $this->permissions()->detach($roles);
+    return $this->permissions()->detach($permissions);
   }
 }

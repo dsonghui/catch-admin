@@ -1,16 +1,19 @@
 <?php
 namespace catchAdmin\permissions\controller;
 
+use catchAdmin\permissions\excel\UserExport;
 use catcher\base\CatchRequest as Request;
 use catchAdmin\permissions\model\Permissions;
 use catchAdmin\permissions\model\Roles;
 use catchAdmin\permissions\model\Users;
 use catchAdmin\permissions\request\CreateRequest;
 use catchAdmin\permissions\request\UpdateRequest;
+use catchAdmin\permissions\request\ProfileRequest;
 use catcher\base\CatchController;
 use catcher\CatchAuth;
 use catcher\CatchCacheKeys;
 use catcher\CatchResponse;
+use catcher\library\excel\Excel;
 use catcher\Tree;
 use catcher\Utils;
 use think\facade\Cache;
@@ -49,7 +52,7 @@ class User extends CatchController
     {
         $user = $auth->user();
 
-        $roles = $user->getRoles();
+        $roles = $user->getRoles()->column('identify');
 
         $permissionIds = $user->getPermissionsBy($user->id);
         // 缓存用户权限
@@ -67,15 +70,6 @@ class User extends CatchController
 
     /**
      *
-     * @time 2019年12月06日
-     * @throws \Exception
-     * @return string
-     */
-    public function create()
-    {}
-
-    /**
-     *
      * @param CreateRequest $request
      * @time 2019年12月06日
      * @return \think\response\Json
@@ -84,9 +78,11 @@ class User extends CatchController
     {
         $this->user->storeBy($request->param());
 
-        $this->user->attach($request->param('roles'));
+        $this->user->attachRoles($request->param('roles'));
 
-        $this->user->attachJobs($request->param('jobs'));
+        if ($request->param('jobs')) {
+            $this->user->attachJobs($request->param('jobs'));
+        }
 
         return CatchResponse::success('', '添加成功');
     }
@@ -106,12 +102,6 @@ class User extends CatchController
     }
 
     /**
-     * @param $id
-     * @return string
-     * @throws \Exception
-     */
-    public function edit($id){}
-    /**
      *
      * @time 2019年12月04日
      * @param $id
@@ -120,15 +110,15 @@ class User extends CatchController
      */
     public function update($id, UpdateRequest $request)
     {
-        $this->user->updateBy($id, $request->param());
+        $this->user->updateBy($id, $request->filterEmptyField()->param());
 
         $user = $this->user->findBy($id);
 
-        $user->detach();
+        $user->detachRoles();
         $user->detachJobs();
 
         if (!empty($request->param('roles'))) {
-            $user->attach($request->param('roles'));
+            $user->attachRoles($request->param('roles'));
         }
         if (!empty($request->param('jobs'))) {
             $user->attachJobs($request->param('jobs'));
@@ -149,7 +139,7 @@ class User extends CatchController
         foreach ($ids as $_id) {
           $user = $this->user->findBy($_id);
           // 删除角色
-          $user->detach();
+          $user->detachRoles();
           // 删除岗位
           $user->detachJobs();
 
@@ -182,47 +172,28 @@ class User extends CatchController
     }
 
     /**
+     * 导出
      *
-     * @time 2019年12月07日
-     * @param $id
+     * @time 2020年09月08日
+     * @param Excel $excel
+     * @param UserExport $userExport
+     * @throws \PhpOffice\PhpSpreadsheet\Exception
      * @return \think\response\Json
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     * @throws \think\db\exception\DataNotFoundException
      */
-    public function recover($id): \think\response\Json
+    public function export(Excel $excel, UserExport $userExport)
     {
-       $trashedUser = $this->user->findBy($id, ['*'], true);
-
-       if ($this->user->where('email', $trashedUser->email)->find()) {
-           return CatchResponse::fail(sprintf('该恢复用户的邮箱 [%s] 已被占用', $trashedUser->email));
-       }
-
-       return CatchResponse::success($this->user->recover($id));
+        return CatchResponse::success($excel->save($userExport, Utils::publicPath('export/users')));
     }
 
     /**
+     * 更新个人信息
      *
-     * @time 2019年12月11日
-     * @param Request $request
-     * @param Roles $roles
+     * @time 2020年09月20日
+     * @param ProfileRequest $request
      * @return \think\response\Json
      */
-    public function getRoles(Request $request, Roles $roles): \think\response\Json
+    public function profile(ProfileRequest $request)
     {
-        $roles = Tree::done($roles->getList());
-
-        $roleIds = [];
-        if ($request->param('uid')) {
-            $userHasRoles = $this->user->findBy($request->param('uid'))->getRoles();
-            foreach ($userHasRoles as $role) {
-                $roleIds[] = $role->pivot->role_id;
-            }
-        }
-
-        return CatchResponse::success([
-            'roles' => $roles,
-            'hasRoles' => $roleIds,
-        ]);
+       return CatchResponse::success($this->user->updateBy($request->user()->id, $request->filterEmptyField()->param()));
     }
 }

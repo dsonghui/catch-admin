@@ -1,19 +1,19 @@
 <?php
 namespace catchAdmin\permissions\controller;
 
-use catchAdmin\permissions\model\Permissions;
+use catchAdmin\permissions\model\Roles;
 use catcher\base\CatchRequest as Request;
 use catcher\base\CatchController;
 use catcher\CatchResponse;
 use catcher\exceptions\FailedException;
-use catcher\Tree;
 use think\response\Json;
+use catchAdmin\permissions\model\Roles as RoleModel;
 
 class Role extends CatchController
 {
     protected $role;
 
-    public function __construct(\catchAdmin\permissions\model\Roles $role)
+    public function __construct(RoleModel $role)
     {
         $this->role = $role;
     }
@@ -21,12 +21,11 @@ class Role extends CatchController
   /**
    *
    * @time 2019年12月09日
-   * @param Request $request
-   * @return string
+   * @return string|Json
    */
     public function index()
     {
-      return CatchResponse::success(Tree::done($this->role->getList()));
+      return CatchResponse::success($this->role->getList());
     }
 
     /**
@@ -38,14 +37,20 @@ class Role extends CatchController
      */
     public function save(Request $request)
     {
-        $this->role->storeBy($request->param());
+        $params = $request->param();
 
-        $permissions = $request->param('permissions');
-        if (!empty($permissions)) {
-            $this->role->attach(array_unique($permissions));
+        if (Roles::where('identify', $params['identify'])->find()) {
+            throw new FailedException('角色标识 [' . $params['identify'] . ']已存在');
         }
-        if (!empty($request->param('departments'))) {
-            $this->role->attachDepartments($request->param('departments'));
+
+        $this->role->storeBy($params);
+        // 分配权限
+        if (count($params['permissions'])) {
+            $this->role->attachPermissions(array_unique($params['permissions']));
+        }
+        // 分配部门
+        if (isset($params['departments']) && count($params['departments'])) {
+            $this->role->attachDepartments($params['departments']);
         }
         // 添加角色
         return CatchResponse::success();
@@ -69,19 +74,57 @@ class Role extends CatchController
      */
     public function update($id, Request $request): Json
     {
+        if (Roles::where('identify', $request->param('identify'))->where('id', '<>', $id)->find()) {
+            throw new FailedException('角色标识 [' . $request->param('identify') . ']已存在');
+        }
+
         $this->role->updateBy($id, $request->param());
         $role = $this->role->findBy($id);
-        $role->detach();
 
-        $permissions = $request->param('permissions');
-        if (!empty($permissions)) {
-            $role->attach(array_unique($permissions));
+        $hasPermissionIds = $role->getPermissions()->column('id');
+
+        $permissionIds = $request->param('permissions');
+
+        // 已存在权限 IDS
+        $existedPermissionIds = [];
+        foreach ($hasPermissionIds as $hasPermissionId) {
+            if (in_array($hasPermissionId, $permissionIds)) {
+                $existedPermissionIds[] = $hasPermissionId;
+            }
         }
 
-        if (!empty($request->param('departments'))) {
-            $role->detachDepartments();
-            $role->attachDepartments($request->param('departments'));
+        $attachIds = array_diff($permissionIds, $existedPermissionIds);
+        $detachIds = array_diff($hasPermissionIds, $existedPermissionIds);
+
+        if (!empty($detachIds)) {
+            $role->detachPermissions($detachIds);
         }
+        if (!empty($attachIds)) {
+            $role->attachPermissions(array_unique($attachIds));
+        }
+
+        // 更新department
+        $hasDepartmentIds = $role->getDepartments()->column('id');
+        $departmentIds = $request->param('departments',[]);
+
+        // 已存在部门 IDS
+        $existedDepartmentIds = [];
+        foreach ($hasDepartmentIds as $hasDepartmentId) {
+            if (in_array($hasDepartmentId, $departmentIds)) {
+                $existedDepartmentIds[] = $hasDepartmentId;
+            }
+        }
+
+        $attachDepartmentIds = array_diff($departmentIds, $existedDepartmentIds);
+        $detachDepartmentIds = array_diff($hasDepartmentIds, $existedDepartmentIds);
+
+        if (!empty($detachDepartmentIds)) {
+            $role->detachDepartments($detachDepartmentIds);
+        }
+        if (!empty($attachDepartmentIds)) {
+            $role->attachDepartments(array_unique($attachDepartmentIds));
+        }
+
         return CatchResponse::success();
     }
 
@@ -102,7 +145,7 @@ class Role extends CatchController
         }
         $role = $this->role->findBy($id);
         // 删除权限
-        $role->detach();
+        $role->detachPermissions();
         // 删除部门关联
         $role->detachDepartments();
         // 删除用户关联
@@ -111,38 +154,5 @@ class Role extends CatchController
         $this->role->deleteBy($id);
 
         return CatchResponse::success();
-    }
-
-    /**
-     *
-     * @time 2019年12月11日
-     * @param Request $request
-     * @param \catchAdmin\permissions\model\Permissions $permission
-     * @return Json
-     */
-    public function getPermissions(Request $request, \catchAdmin\permissions\model\Permissions $permission): Json
-    {
-        $parentRoleHasPermissionIds = [];
-        if ($request->param('parent_id')) {
-            $permissions = $this->role->findBy($request->param('parent_id'))->getPermissions();
-            foreach ($permissions as $_permission) {
-                $parentRoleHasPermissionIds[] = $_permission->pivot->permission_id;
-            }
-        }
-
-        $permissions = Tree::done(Permissions::whereIn('id', $parentRoleHasPermissionIds)->select()->toArray());
-
-        $permissionIds = [];
-        if ($request->param('role_id')) {
-            $roleHasPermissions = $this->role->findBy($request->param('role_id'))->getPermissions();
-            foreach ($roleHasPermissions as $_permission) {
-                $permissionIds[] = $_permission->pivot->permission_id;
-            }
-        }
-
-        return CatchResponse::success([
-            'permissions' => $permissions,
-            'hasPermissions' => $permissionIds,
-        ]);
     }
 }

@@ -2,6 +2,7 @@
 namespace catchAdmin\system\model;
 
 use catcher\base\CatchModel;
+use catcher\exceptions\FailedException;
 use thans\jwt\exception\UserNotDefinedException;
 use think\Model;
 
@@ -55,92 +56,43 @@ class Config extends CatchModel
             return true;
         }
 
-        // 子配置
-        if ($data['pid'] ?? false) {
-            $config = \json_decode($data['config'], true);
-            $pid = $data['pid'];
-            unset($data['pid']);
-            /**[
-                'key' => [
-                    'k' => 'v'
-                ],
+        $parent = $data['parent'] ?? false;
+        if (!$parent) {
+            throw new FailedException('父配置丢失');
+        }
+        unset($data['parent']);
 
-                'k' => 'v'
-            ]*/
-            foreach ($config as $key => $value) {
-                if (empty($value)) {
-                    continue;
-                }
-                // 如果二级配置存在
-                $secondLevel = $this->isExistConfig($key, $pid);
-                if ($secondLevel) {
-                    // value 是字符串
-                    if (!is_array($value)) {
-                        if ($value != $secondLevel->value) {
-                            $secondLevel->value = $value;
-                            $secondLevel->save();
-                        }
-                    } else {
-                        // 数组
-                        $thirdLevel = [];
-                        $this->subConfig($secondLevel->id, ['id', 'key', 'value'])
-                             ->each(function ($item, $key) use (&$thirdLevel){
-                                 $thirdLevel[$item['key']] = $item;
-                             });
-
-                        if (!empty($value)) {
-                            $new = [];
-                            foreach ($value as $k => $v) {
-                                if (isset($thirdLevel[$k])) {
-                                    if ($v != $thirdLevel[$k]->value) {
-                                        $thirdLevel[$k]->value = $v;
-                                        $thirdLevel[$k]->save();
-                                    }
-                                } else {
-                                    $new[] = [
-                                        'pid' => $secondLevel->id,
-                                        'key' => $k,
-                                        'value' => $v,
-                                    ];
-                                }
-                            }
-
-                            if (!empty($new)) {
-                                parent::insertAllBy($new);
-                            }
-                        }
-                    }
-                } else {
-                    if (!is_array($value)) {
-                        parent::createBy([
-                            'pid' => $pid,
-                            'key' => $key,
-                            'value' => $value,
-                        ]);
-                    } else {
-                        $id = parent::createBy([
-                            'pid' => $pid,
-                            'key' => $key,
-                        ]);
-                        if (!empty($value)) {
-                            $newConfig = [];
-                            foreach ($value as $k => $v) {
-                                $newConfig[] = [
-                                    'key' => $k,
-                                    'value' => $v,
-                                    'pid' => $id,
-                                ];
-                            }
-                            parent::insertAllBy($newConfig);
-                        }
-                    }
-                }
+        $parentConfig = $this->where('key', $parent)->find();
+        $config = [];
+        foreach ($data as $key => $item) {
+            foreach ($item as $k => $value) {
+                $config[$key . '.' .$k] = [
+                    'pid' => $parentConfig['id'],
+                    'key' => $key . '.' . $k,
+                    'value' => $value,
+                    'created_at' => time(),
+                    'updated_at' => time(),
+                ];
             }
-
-            return true;
         }
 
-        return parent::storeBy($data);
+        $this->where('pid', $parentConfig->id)
+           ->select()
+           ->each(function ($item) use (&$config){
+               if (isset($config[$item['key']])) {
+                  if ($config[$item['key']]['value'] != $item->value) {
+                      $item['value'] = $config[$item['key']]['value'];
+                      $item->save();
+                  }
+                   unset($config[$item['key']]);
+              }
+           });
+
+        if (count($config)) {
+            return $this->insertAll($config);
+        }
+
+        return true;
     }
 
     /**
@@ -183,28 +135,26 @@ class Config extends CatchModel
      * 获取配置
      *
      * @time 2020年04月20日
-     * @param int $pid
+     * @param string $component
      * @throws \think\db\exception\DataNotFoundException
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
      * @return array|mixed
      */
-    public function getConfig($pid = 0)
+    public function getConfig(string $component)
     {
         $data = [];
-
-        $configs = $this->where('pid', $pid)
+        $configs = $this->where('pid', $this->where('component', $component)->value('id'))
                       ->field('id,`key` as k,value,pid')
                       ->select();
 
         foreach ($configs as $config) {
-            if ($config->value !== '') {
-                $data[$config->k] = $config->value;
-            } else {
-                $data[$config->k] = $this->getConfig($config->id);
+            if (strpos($config['k'], '.') !== false) {
+                list($object, $key) = explode('.', $config['k']);
+                $data[$object][$key] = $config['value'];
             }
         }
 
-        return empty($data) ? '' : $data;
+        return $data;
     }
 }

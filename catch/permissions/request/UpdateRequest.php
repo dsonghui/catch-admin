@@ -15,9 +15,4 @@ class UpdateRequest extends CatchRequest
             'email|邮箱'    => 'require|email|unique:'.Users::class,
         ];
     }
-
-    protected function message(): array
-    {
-        // TODO: Implement message() method.
-    }
 }

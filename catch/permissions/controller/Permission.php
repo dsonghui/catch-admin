@@ -9,6 +9,7 @@ use catcher\exceptions\FailedException;
 use catcher\library\ParseClass;
 use catcher\Tree;
 use catchAdmin\permissions\model\Permissions;
+use think\helper\Str;
 use think\response\Json;
 
 class Permission extends CatchController
@@ -46,9 +47,9 @@ class Permission extends CatchController
         // 子节点的 key
         $children = $request->param('actionList') ?? 'children';
         // 返回树结构
-        return CatchResponse::success(Tree::done($menuList->each(function (&$item) use ($buttonList, $children){
+        return CatchResponse::success($menuList->each(function (&$item) use ($buttonList, $children){
             $item[$children] = $buttonList[$item['id']] ?? [];
-        })->toArray()));
+        })->toTree());
     }
 
   /**
@@ -66,9 +67,22 @@ class Permission extends CatchController
 
         // 如果是子分类 自动写入父类模块
         $parentId = $params['parent_id'] ?? 0;
-        if ($parentId) {
-            $parent = $this->permissions->findBy($parentId);
-            $params['module'] = $parent->module;
+        // 按钮类型寻找上级
+        if ($params['type'] == Permissions::BTN_TYPE && $parentId) {
+            $permissionMark = $params['permission_mark'];
+            // 查找父级
+            $parentPermission = $this->permissions->findBy($parentId);
+            // 如果父级是顶级 parent_id = 0
+            if ($parentPermission->parent_id) {
+                if (Str::contains($parentPermission->permission_mark, '@')) {
+                    list($controller, $action) = explode('@', $parentPermission->permission_mark);
+                    $permissionMark = $controller . '@' . $permissionMark;
+                } else {
+                    $permissionMark = $parentPermission->permission_mark .'@'. $permissionMark;
+                }
+            }
+            $params['permission_mark'] = $permissionMark;
+            $params['module'] = $parentPermission->module;
         }
 
         return CatchResponse::success($this->permissions->storeBy($params));
@@ -85,19 +99,23 @@ class Permission extends CatchController
     {
         $permission = $this->permissions->findBy($id);
 
-        $params = array_merge($request->param(), [
+        $params = $request->param();
+
+        // 按钮类型
+        if ($params['type'] == Permissions::BTN_TYPE && $permission->parent_id) {
+            return CatchResponse::success($this->permissions->updateButton($params, $permission));
+        }
+
+        $params = array_merge($params, [
             'parent_id' => $permission->parent_id,
             'level'     => $permission->level
         ]);
 
-        // 如果是父分类需要更新所有子分类的模块
-        if (!$permission->parent_id) {
-            $this->permissions->updateBy($permission->parent_id, [
-              'module' => $permission->module,
-            ], 'parent_id');
+        if ($this->permissions->updateMenu($id, $params)) {
+            return CatchResponse::success();
         }
 
-        return CatchResponse::success($this->permissions->updateBy($id, $params));
+        throw new FailedException('更新失败');
     }
 
     /**
@@ -132,40 +150,7 @@ class Permission extends CatchController
      */
     public function show($id)
     {
-        $permission = $this->permissions->findBy($id);
-
-        $permission->status = $permission->status == Permissions::ENABLE ? Permissions::DISABLE : Permissions::ENABLE;
-
-        if ($permission->save()) {
-            $this->permissions->where('parent_id', $id)->update([
-                'status' => $permission->status,
-            ]);
-        }
-
-        return CatchResponse::success($permission->save());
-    }
-
-    /**
-     *
-     * @time 2020年06月05日
-     * @param $id
-     * @param ParseClass $parseClass
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     * @return Json
-     */
-    public function getMethods($id, ParseClass $parseClass)
-    {
-        $permission = Permissions::where('id', $id)->find();
-
-        $module = $permission->module;
-
-        $controller = explode('@', $permission->permission_mark)[0];
-
-        $methods = $parseClass->setModule('catch')->setRule($module, $controller)->onlySelfMethods();
-
-        return CatchResponse::success($methods);
+        return CatchResponse::success($this->permissions->show($id));
     }
 }
 

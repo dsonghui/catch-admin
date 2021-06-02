@@ -1,21 +1,9 @@
 <?php
+declare(strict_types=1);
+
 namespace catcher;
 
-use catcher\command\publish\WechatCommand;
-use catcher\command\Tools\BackupCommand;
-use catcher\command\Tools\CompressPackageCommand;
-use catcher\command\CreateModuleCommand;
-use catcher\command\install\InstallProjectCommand;
-use catcher\command\MigrateCreateCommand;
-use catcher\command\MigrateRollbackCommand;
-use catcher\command\MigrateRunCommand;
-use catcher\command\ModelGeneratorCommand;
-use catcher\command\ModuleCacheCommand;
-use catcher\command\SeedRunCommand;
-use catcher\command\Tools\ExportDataCommand;
-use catcher\command\Tools\MakeMenuCommand;
-use catcher\command\worker\ExcelTaskCommand;
-use catcher\command\worker\WsWorkerCommand;
+use catcher\event\LoadModuleRoutes;
 use think\exception\Handle;
 use think\facade\Validate;
 use think\Service;
@@ -28,8 +16,7 @@ class CatchAdminService extends Service
      * @return void
      */
     public function boot()
-    {
-    }
+    {}
 
     /**
      * register
@@ -47,6 +34,8 @@ class CatchAdminService extends Service
         $this->registerEvents();
         $this->registerQuery();
         $this->registerExceptionHandle();
+        $this->registerRoutePath();
+        $this->registerServices();
     }
 
     /**
@@ -56,23 +45,13 @@ class CatchAdminService extends Service
      */
     protected function registerCommands(): void
     {
-        $this->commands([
-            InstallProjectCommand::class,
-            ModuleCacheCommand::class,
-            MigrateRunCommand::class,
-            ModelGeneratorCommand::class,
-            SeedRunCommand::class,
-            BackupCommand::class,
-            CompressPackageCommand::class,
-            CreateModuleCommand::class,
-            MigrateRollbackCommand::class,
-            MigrateCreateCommand::class,
-            WsWorkerCommand::class,
-            ExportDataCommand::class,
-            MakeMenuCommand::class,
-            ExcelTaskCommand::class,
-            WechatCommand::class
-        ]);
+        if ($this->app->runningInConsole()) {
+            $catchConsole = new CatchConsole($this->app);
+
+            $this->app->bind('catch\console', $catchConsole);
+
+            $this->commands($catchConsole->defaultCommands());
+        }
     }
     /**
      *
@@ -109,7 +88,9 @@ class CatchAdminService extends Service
      */
     protected function registerEvents(): void
     {
-        $this->app->event->listenEvents(config('catch.events'));
+        $this->app->event->listenEvents([
+            'RouteLoaded' => [LoadModuleRoutes::class]
+        ]);
     }
 
   /**
@@ -122,7 +103,10 @@ class CatchAdminService extends Service
     {
         $connections = $this->app->config->get('database.connections');
 
-        $connections['mysql']['query'] = CatchQuery::class;
+        // 支持多数据库配置注入 Query
+        foreach ($connections as &$connection) {
+            $connection['query'] = CatchQuery::class;
+        }
 
         $this->app->config->set([
           'connections' => $connections
@@ -138,5 +122,46 @@ class CatchAdminService extends Service
     protected function registerExceptionHandle(): void
     {
         $this->app->bind(Handle::class, CatchExceptionHandle::class);
+    }
+
+    /**
+     * 注册模块服务
+     *
+     * @time 2020年06月23日
+     * @return void
+     */
+    protected function registerServices()
+    {
+        $services = file_exists(CatchAdmin::getCacheServicesFile()) ?
+            include CatchAdmin::getCacheServicesFile() :
+            CatchAdmin::getEnabledService();
+
+        foreach ($services as $service) {
+            if (class_exists($service)) {
+                $this->app->register($service);
+            }
+        }
+    }
+
+    /**
+     * 注册路由地址
+     *
+     * @time 2020年06月23日
+     * @return void
+     */
+    protected function registerRoutePath()
+    {
+        $this->app->instance('routePath', new class {
+            protected $path = [];
+            public function loadRouterFrom($path)
+            {
+                $this->path[] = $path;
+                return $this;
+            }
+            public function get()
+            {
+                return $this->path;
+            }
+        });
     }
 }

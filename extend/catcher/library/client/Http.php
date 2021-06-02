@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 namespace catcher\library\client;
 
 use catcher\exceptions\FailedException;
@@ -29,18 +31,39 @@ class Http
      */
     protected $proxy = [];
 
+    /**
+     * body
+     *
+     * @var array
+     */
     protected $body = [];
 
-
+    /**
+     * header
+     *
+     * @var array
+     */
     protected $header = [];
 
-
+    /**
+     * form params
+     *
+     * @var array
+     */
     protected $formParams = [];
 
-
+    /**
+     * query set
+     *
+     * @var array
+     */
     protected $query = [];
 
-
+    /**
+     * json set
+     *
+     * @var array
+     */
     protected $json = [];
 
     /**
@@ -68,6 +91,14 @@ class Http
     protected $token = '';
 
     protected $multipart = [];
+
+    /**
+     * 忽略证书
+     *
+     * @var array
+     */
+    protected $ignoreSsl = [];
+
     /**
      * 获取 Guzzle 客户端
      *
@@ -195,6 +226,20 @@ class Http
     }
 
     /**
+     * 忽略 ssl 证书
+     *
+     * @return $this
+     */
+    public function ignoreSsl()
+    {
+        $this->ignoreSsl = [
+            'verify' => false,
+        ];
+
+        return $this;
+    }
+
+    /**
      * 可选参数
      *
      * @time 2020年05月22日
@@ -265,7 +310,8 @@ class Http
     protected function merge()
     {
         return array_merge($this->header, $this->query, $this->timeout,
-            $this->options, $this->body, $this->auth, $this->multipart, $this->formParams
+            $this->options, $this->body, $this->auth, $this->multipart, $this->formParams,
+            $this->ignoreSsl
         );
     }
 

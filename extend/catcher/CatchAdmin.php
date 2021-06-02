@@ -1,11 +1,16 @@
 <?php
+declare(strict_types=1);
+
 namespace catcher;
 
-use think\helper\Arr;
+use catcher\facade\FileSystem;
 
 class CatchAdmin
 {
-    public const NAME = 'catch';
+    public static $root = 'catch';
+
+    public const VERSION = '2.5.0';
+
 
     /**
      *
@@ -14,7 +19,21 @@ class CatchAdmin
      */
     public static function directory(): string
     {
-        return app()->getRootPath() . self::NAME . DIRECTORY_SEPARATOR;
+        return app()->getRootPath() . self::$root . DIRECTORY_SEPARATOR;
+    }
+
+    /**
+     * 设置 root
+     *
+     * @time 2021年03月28日
+     * @param $root
+     * @return CatchAdmin
+     */
+    public static function setRoot($root): CatchAdmin
+    {
+        self::$root = $root;
+
+        return new self();
     }
 
     /**
@@ -51,7 +70,7 @@ class CatchAdmin
      */
     public static function cacheDirectory(): string
     {
-        return self::makeDirectory(app()->getRuntimePath() . self::NAME . DIRECTORY_SEPARATOR);
+        return self::makeDirectory(app()->getRuntimePath() . self::$root . DIRECTORY_SEPARATOR);
     }
 
     /**
@@ -84,7 +103,11 @@ class CatchAdmin
      */
     public static function moduleSeedsDirectory($module): string
     {
-        return self::directory() . $module . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR. 'seeds' . DIRECTORY_SEPARATOR;
+        $seedPath = self::directory() . $module . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR. 'seeds' . DIRECTORY_SEPARATOR;
+
+        self::makeDirectory($seedPath);
+
+        return  $seedPath;
     }
 
     /**
@@ -132,6 +155,7 @@ class CatchAdmin
     /**
      *
      * @time 2019年12月12日
+     * @param bool $select
      * @return array
      */
     public static function getModulesInfo($select = true): array
@@ -177,39 +201,92 @@ class CatchAdmin
     }
 
     /**
+     * 获取可用模块
      *
-     * @time 2019年11月30日
+     * @time 2020年06月23日
      * @return array
      */
-    protected static function getModuleViews(): array
+    public static function getEnabledService(): array
     {
-        $views = [];
+        $services = [];
 
         foreach (self::getModulesDirectory() as $module) {
-            if (is_dir($module . 'view')) {
+            if (is_dir($module)) {
                 $moduleInfo = self::getModuleInfo($module);
-                $moduleName = $moduleInfo['alias'] ?? Arr::last(explode('/', $module));
-                $views[$moduleName] = $module . 'view' . DIRECTORY_SEPARATOR;
+                // 如果没有设置 module.json 默认加载
+                $moduleServices = $moduleInfo['services'] ?? [];
+                if (!empty($moduleServices) && $moduleInfo['enable']) {
+                    $services = array_merge($services, $moduleServices);
+                }
             }
         }
 
-        return $views;
+        return $services;
+    }
+
+    /**
+     * 获取模块 Json
+     *
+     * @time 2021年02月08日
+     * @param $module
+     * @return string
+     */
+    public static function getModuleJson($module): string
+    {
+        if (is_dir($module)) {
+            return $module . DIRECTORY_SEPARATOR . 'module.json';
+        }
+
+        return self::moduleDirectory($module) . 'module.json';
     }
 
     /**
      * 获取模块信息
      *
-     * @time 2019年11月30日
+     * @time 2021年02月08日
      * @param $module
-     * @return mixed
+     * @return array
      */
-    public static function getModuleInfo($module)
+    public static function getModuleInfo($module): array
     {
-        if (file_exists($module . DIRECTORY_SEPARATOR . 'module.json')) {
-            return \json_decode(file_get_contents($module . DIRECTORY_SEPARATOR . 'module.json'), true);
+        $moduleJson = self::getModuleJson($module);
+
+        if (!file_exists($moduleJson)) {
+            return [];
         }
 
-        return [];
+        return \json_decode(FileSystem::sharedGet($moduleJson), true);
+    }
+
+    /**
+     * 更新模块信息
+     *
+     * @time 2021年02月08日
+     * @param $module
+     * @param $info
+     * @return bool
+     */
+    public static function updateModuleInfo($module, $info): bool
+    {
+        $moduleInfo = self::getModuleInfo($module);
+
+        if (!count($moduleInfo)) {
+            return false;
+        }
+
+        foreach ($moduleInfo as $k => $v) {
+            if (isset($info[$k])) {
+                $moduleInfo[$k] = $info[$k];
+            }
+        }
+
+        if (! is_writeable(self::getModuleJson($module))) {
+            chmod(self::getModuleJson($module), 666);
+        }
+
+        FileSystem::put(self::getModuleJson($module), \json_encode($moduleInfo, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
+
+        return true;
     }
 
     /**
@@ -232,7 +309,7 @@ class CatchAdmin
      * @time 2019年11月30日
      * @return mixed
      */
-    public static function getRoutes()
+    public static function getRoutes(): array
     {
         if (file_exists(self::getCacheRoutesFile())) {
             return [self::getCacheRoutesFile()];
@@ -241,19 +318,6 @@ class CatchAdmin
         return self::getModuleRoutes();
     }
 
-    /**
-     *
-     * @time 2019年11月30日
-     * @return array|mixed
-     */
-    public static function getViews()
-    {
-        if (file_exists(self::getCacheViewsFile())) {
-            return self::getCacheViews();
-        }
-
-        return self::getModuleViews();
-    }
 
     /**
      *
@@ -272,8 +336,8 @@ class CatchAdmin
         }
 
         return $routeFiles;
-
     }
+
     /**
      *
      * @time 2019年11月30日
@@ -298,28 +362,7 @@ class CatchAdmin
     public static function cacheServices()
     {
         return file_put_contents(self::getCacheServicesFile(), "<?php\r\n return "
-            . var_export(self::getModuleServices(), true) . ';');
-    }
-
-    /**
-     *
-     * @time 2019年11月30日
-     * @return false|int
-     */
-    public static function cacheViews()
-    {
-        return file_put_contents(self::getCacheViewsFile(), "<?php\r\n return "
-            . var_export(self::getModuleViews(), true) . ';');
-    }
-
-    /**
-     *
-     * @time 2019年11月30日
-     * @return mixed
-     */
-    protected static function getCacheViews()
-    {
-        return include self::getCacheViewsFile();
+            . var_export(self::getEnabledService(), true) . ';');
     }
 
     /**
@@ -331,22 +374,13 @@ class CatchAdmin
     {
         return include self::getCacheServicesFile();
     }
-    /**
-     *
-     * @time 2019年11月30日
-     * @return mixed
-     */
-    protected static function getCacheViewsFile()
-    {
-        return self::cacheDirectory() . 'views.php';
-    }
 
     /**
      *
      * @time 2019年11月30日
      * @return mixed
      */
-    protected static function getCacheServicesFile()
+    public static function getCacheServicesFile(): string
     {
         return self::cacheDirectory() . 'services.php';
     }

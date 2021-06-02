@@ -4,6 +4,8 @@ namespace catchAdmin\permissions\model;
 use catchAdmin\permissions\model\search\UserSearch;
 use catcher\base\CatchModel;
 use catcher\exceptions\FailedException;
+use catcher\Utils;
+use think\Paginator;
 
 class Users extends CatchModel
 {
@@ -18,6 +20,8 @@ class Users extends CatchModel
 			'username', // 用户名
 			'password', // 用户密码
 			'email', // 邮箱 登录
+            'avatar', // 头像
+            'remember_token',
             'creator_id', // 创建者ID
             'department_id', // 部门ID
 			'status', // 用户状态 1 正常 2 禁用
@@ -26,7 +30,6 @@ class Users extends CatchModel
 			'created_at', // 创建时间
 			'updated_at', // 更新时间
 			'deleted_at', // 删除状态，0未删除 >0 已删除
-			   
     ];
 
     /**
@@ -45,16 +48,25 @@ class Users extends CatchModel
      * 用户列表
      *
      * @time 2019年12月08日
-     * @throws \think\db\exception\DbException
-     * @return \think\Paginator
+     * @return array|\think\Paginator
+     *@throws \think\db\exception\DbException
      */
-    public function getList(): \think\Paginator
+    public function getList()
     {
-        return $this->withoutField(['updated_at'], true)
+        $users = $this->withoutField(['updated_at', 'password', 'remember_token'], true)
                     ->catchSearch()
                     ->catchLeftJoin(Department::class, 'id', 'department_id', ['department_name'])
+                    ->with(['jobs', 'roles'])
                     ->order($this->aliasField('id'), 'desc')
-                    ->paginate();
+                    ->paginate()->toArray();
+
+        foreach ($users['data'] as &$user) {
+            $user['roles'] = array_column($user['roles'], 'id');
+            $user['jobs'] = array_column($user['jobs'], 'id');
+        }
+
+
+        return Paginator::make($users['data'], $users['per_page'], $users['current_page'], $users['total']);
     }
 
     /**
@@ -82,5 +94,28 @@ class Users extends CatchModel
         }
 
         return array_unique($permissionIds);
+    }
+	
+	 /**
+     * 后台根据权限标识判断用户是否拥有某个权限
+     * @param string $permission_mark
+     * @return bool
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\DbException
+     * @throws \think\db\exception\ModelNotFoundException
+     *
+     * 用法  request()->user()->can('permission@create');
+     */
+    public function can($permission_mark)
+    {
+        // 超级管理员直接返回true
+        if (Utils::isSuperAdmin()){
+            return true;
+        }
+        // 查询当前用户的权限
+        return in_array(
+            Permissions::where('permission_mark',$permission_mark)->value('id') ? : 0,
+            $this->getPermissionsBy()
+        );
     }
 }

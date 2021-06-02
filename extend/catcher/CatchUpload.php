@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 namespace catcher;
 
 use catchAdmin\system\model\Attachments;
@@ -27,11 +29,11 @@ class CatchUpload
     public const QIQNIU = 'qiniu';
 
     /**
-     * 本地
+     * 驱动
      *
      * @var string
      */
-    protected $driver = 'local';
+    protected $driver;
 
     /**
      * 本地
@@ -45,35 +47,75 @@ class CatchUpload
      */
     protected $path = '';
 
-  /**
-   * upload files
-   *
-   * @param UploadedFile $file
-   * @return string
-   * @author JaguarJack
-   * @email njphper@gmail.com
-   * @time 2020/1/25
-   */
+    /**
+     * upload files
+     *
+     * @param UploadedFile $file
+     * @return string
+     * @author JaguarJack
+     * @email njphper@gmail.com
+     * @time 2020/1/25
+     */
     public function upload(UploadedFile $file): string
     {
-        $this->initUploadConfig();
+        try {
+            $this->initUploadConfig();
 
-        $path = Filesystem::disk($this->getDriver())->putFile($this->getPath(), $file);
+            $path = Filesystem::disk($this->getDriver())->putFile($this->getPath(), $file);
 
-        if ($path) {
-            $url = self::getCloudDomain($this->getDriver()) . $path;
+            if ($path) {
 
-            event('attachment', [
-                'path' => $path,
-                'url' => $url,
-                'driver' => $this->getDriver(),
-                'file' => $file,
-            ]);
+                $url = self::getCloudDomain($this->getDriver()) . '/' . $this->getLocalPath($path);
 
-            return $url;
+                event('attachment', [
+                    'path' => $path,
+                    'url' => $url,
+                    'driver' => $this->getDriver(),
+                    'file' => $file,
+                ]);
+
+                return $url;
+            }
+
+            throw new FailedException('Upload Failed, Try Again!');
+
+        } catch (\Exception $exception) {
+            throw new FailedException($exception->getMessage());
+        }
+    }
+
+    /**
+     * 上传到 Local
+     *
+     * @time 2021年04月21日
+     * @param $file
+     * @return string
+     */
+    public function toLocal($file): string
+    {
+        $path = Filesystem::disk(self::LOCAL)->putFile($this->getPath(), $file);
+
+        return public_path() . $this->getLocalPath($path);
+    }
+
+
+    /**
+     * 本地路径
+     *
+     * @time 2020年09月07日
+     * @param $path
+     * @return string
+     */
+    protected function getLocalPath($path): string
+    {
+        if ($this->getDriver() === self::LOCAL) {
+
+            $path = str_replace(root_path('public'),  '', \config('filesystem.disks.local.root')) . DIRECTORY_SEPARATOR .$path;
+
+            return str_replace('\\', '/', $path);
         }
 
-        throw new FailedException('Upload Failed, Try Again!');
+        return $path;
     }
 
     /**
@@ -109,7 +151,11 @@ class CatchUpload
      */
     protected function getDriver(): string
     {
-        return $this->driver;
+        if ($this->driver) {
+            return $this->driver;
+        }
+
+        return \config('filesystem.default');
     }
 
     /**
@@ -160,12 +206,12 @@ class CatchUpload
         return $this;
     }
 
-  /**
-   *
-   * @time 2020年01月25日
-   * @param UploadedFile $file
-   * @return array
-   */
+    /**
+     *
+     * @time 2020年01月25日
+     * @param UploadedFile $file
+     * @return array
+     */
     protected function data(UploadedFile $file)
     {
         return [
@@ -223,53 +269,9 @@ class CatchUpload
      * @time 2020年06月01日
      * @return void
      */
-    protected function initUploadConfig()
+    public function initUploadConfig()
     {
-        $configModel = app(Config::class);
-
-        $upload = $configModel->where('key', 'upload')->find();
-
-        if ($upload) {
-            $disk = app()->config->get('filesystem.disks');
-
-            $uploadConfigs = $configModel->getConfig($upload->id);
-            if (!empty($uploadConfigs)) {
-                // 读取上传可配置数据
-                foreach ($uploadConfigs as $key => &$config) {
-                    // $disk[$key]['type'] = $key;
-                    // 腾讯云配置处理
-                    if (strtolower($key) == 'qcloud') {
-                        $config['credentials'] = [
-                            'appId' => $config['app_id'] ?? '',
-                            'secretKey' => $config['secret_key'] ?? '',
-                            'secretId' => $config['secret_id'] ?? '',
-                        ];
-                        $readFromCdn = $config['read_from_cdn'] ?? false;
-                        $config['read_from_cdn'] = $readFromCdn ? true : false;
-                    }
-                    // OSS 配置
-                    if (strtolower($key) == 'oss') {
-                        $isCname = $config['is_cname'] ?? false;
-                        $config['is_cname'] = $isCname ? true : false;
-                    }
-                }
-
-                // 合并数组
-                array_walk($disk, function (&$item, $key) use ($uploadConfigs) {
-                    if (!in_array($key, ['public', 'local'])) {
-                        if ($uploadConfigs[$key] ?? false) {
-                            foreach ($uploadConfigs[$key] as $k => $value) {
-                                $item[$k] = $value;
-                            }
-                        }
-                    }
-                });
-                // 重新分配配置
-                app()->config->set([
-                    'disk' => $disk,
-                ], 'filesystem');
-            }
-        }
+        Utils::setFilesystemConfig();
     }
 
     /**
@@ -288,11 +290,27 @@ class CatchUpload
             case CatchUpload::LOCAL:
                 return $driver['domain'];
             case CatchUpload::OSS:
-                return $driver['end_point'];
+                return self::getOssDomain();
             case CatchUpload::QCLOUD:
                 return $driver['cdn'];
             default:
                 throw new FailedException(sprintf('Driver [%s] Not Supported.', $driver));
         }
+    }
+
+    /**
+     * 获取 OSS Domain
+     *
+     * @time 2021年01月20日
+     * @return mixed|string
+     */
+    protected static function getOssDomain(): string
+    {
+        $oss = \config('filesystem.disks.oss');
+        if ($oss['is_cname'] === false) {
+            return 'https://' . $oss['bucket'] . '.' . $oss['end_point'];
+        }
+
+        return $oss['end_point'];
     }
 }

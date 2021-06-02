@@ -15,6 +15,7 @@ use catcher\base\CatchController;
 use catcher\base\CatchRequest;
 use catcher\CatchResponse;
 use catcher\CatchUpload;
+use catcher\exceptions\FailedException;
 
 class Upload extends CatchController
 {
@@ -35,9 +36,15 @@ class Upload extends CatchController
    */
     public function image(CatchRequest $request, CatchUpload $upload): \think\response\Json
     {
-        $images = $request->file();
+        $images = array_values($request->file());
 
-        return CatchResponse::success($upload->checkImages($images)->multiUpload($images['image']));
+        if (!count($images)) {
+            throw new FailedException('请选择图片上传');
+        }
+
+        return CatchResponse::success($upload->checkImages($images)->multiUpload(
+            count($images) < 2 ? $images[0] : $images
+        ));
     }
 
   /**

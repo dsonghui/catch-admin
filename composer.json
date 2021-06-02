@@ -18,22 +18,29 @@
     ],
     "require": {
         "php": ">=7.1.0",
-        "topthink/framework": "^6.0.0",
-        "topthink/think-orm": "v2.0.31",
+        "topthink/framework": "6.0.8",
+        "topthink/think-orm": "2.0.36",
         "topthink/think-migration": "^3.0",
-        "thans/tp-jwt-auth": "^1.0",
-        "workerman/workerman": "^3.5",
-        "jaguarjack/think-filesystem-cloud": "dev-master",
+        "thans/tp-jwt-auth": "^1.1",
         "overtrue/wechat": "^4.2",
-         "ext-json": "*",
+        "phpoffice/phpspreadsheet": "^1.12",
+        "dragonmantank/cron-expression": "3.1",
+        "symfony/finder": "^4.4",
+        "ext-json": "*",
+        "overtrue/easy-sms": "^1.1",
         "jaguarjack/migration-generator": "dev-master",
         "ext-zip": "*",
-        "phpoffice/phpspreadsheet": "^1.12",
-        "league/fractal": "^0.18.0"
+        "league/fractal": "^0.18.0",
+        "lcobucci/jwt": "3.3",
+        "jaguarjack/think-filesystem-cloud": "1.0",
+        "topthink/think-view": "^1.0",
+        "xaboy/form-builder": "~2.0"
     },
     "require-dev": {
-        "symfony/var-dumper": "^4.2",
-        "topthink/think-trace":"^1.0"
+        "topthink/think-trace": "^1.0",
+        "symfony/var-dumper": "^5.1",
+        "swoole/ide-helper": "^4.5",
+        "nikic/php-parser": "^4.10"
     },
     "autoload": {
         "psr-4": {
@@ -42,6 +49,11 @@
         },
         "psr-0": {
             "": "extend/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "catchAdmin\\tests\\": "tests"
         }
     },
     "config": {

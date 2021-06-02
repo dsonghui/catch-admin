@@ -1,6 +1,7 @@
 <?php
 namespace catcher\generate\factory;
 
+use catcher\facade\FileSystem;
 use catcher\generate\template\Content;
 
 class Route extends Factory
@@ -15,27 +16,66 @@ class Route extends Factory
 
     protected $methods = [];
 
-    public function done($params = [])
+    public function done(array $params = [])
     {
         $route = [];
 
         if ($this->restful) {
-            $route[] = sprintf("\$router->resource('%s', '\%s')", $this->controllerName, $this->controller);
+            $route[] = sprintf("\$router->resource('%s', '\%s');", $this->controllerName, $this->controller);
         }
 
         if (!empty($this->methods)) {
             foreach ($this->methods as $method) {
-                $route[] = sprintf("\$router->%s('%s/%s', '\%s@%s')", $method[1], $this->controllerName, $method[0], $this->controller, $method[0] );
+                $route[] = sprintf("\$router->%s('%s/%s', '\%s@%s');", $method[1], $this->controllerName, $method[0], $this->controller, $method[0] );
             }
         }
 
         $router = $this->getModulePath($this->controller) . DIRECTORY_SEPARATOR . 'route.php';
 
+        $comment = '// ' . $this->controllerName . '路由';
+
+        array_unshift($route, $comment);
+
         if (file_exists($router)) {
-            return file_put_contents($router, PHP_EOL . implode(';'. PHP_EOL , $route) . ';', FILE_APPEND);
+            return FileSystem::put($router, $this->parseRoute($router, $route));
         }
 
-        return file_put_contents($router, $this->header() . implode(';'. PHP_EOL , $route) . ';');
+        return FileSystem::put($router, $this->header() . $comment. implode(';'. PHP_EOL , $route) . ';');
+    }
+
+    protected function parseRoute($path, $route)
+    {
+        $file = new \SplFileObject($path);
+        // 保留所有行
+        $lines = [];
+        // 结尾之后的数据
+        $down = [];
+        // 结尾数据
+        $end = '';
+        while (!$file->eof()) {
+            $lines[] = rtrim($file->current(), PHP_EOL);
+            $file->next();
+        }
+
+        while (count($lines)) {
+            $line = array_pop($lines);
+            if (strpos($line, '})') !== false) {
+                $end = $line;
+                break;
+            }
+            array_unshift($down, $line);
+        }
+
+        $router = implode(PHP_EOL, $lines) . PHP_EOL;
+
+        $routes = array_merge($down, $route);
+
+        foreach ($routes as $r) {
+            if ($r) {
+                $router .= "\t" . $r . PHP_EOL;
+            }
+        }
+        return $router .= $end;
     }
 
     /**

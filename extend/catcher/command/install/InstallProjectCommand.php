@@ -2,6 +2,7 @@
 namespace catcher\command\install;
 
 use catcher\CatchAdmin;
+use catcher\library\InstallLocalModule;
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Option;
@@ -12,6 +13,8 @@ class InstallProjectCommand extends Command
 {
 
     protected $databaseLink = [];
+
+    protected $defaultModule = ['permissions', 'system'];
 
     protected function configure()
     {
@@ -111,6 +114,12 @@ class InstallProjectCommand extends Command
             return false;
         }
 
+        // 设置 app domain
+        $appDomain = strtolower($this->output->ask($this->input, '👉 first, you should set app domain: '));
+        if (strpos($appDomain, 'http://') === false || strpos( $appDomain, 'https://') === false) {
+            $appDomain = 'http://' . $appDomain;
+        }
+
         $answer = strtolower($this->output->ask($this->input, '🤔️ Did You Need to Set Database information? (Y/N): '));
 
         if ($answer === 'y' || $answer === 'yes') {
@@ -142,7 +151,7 @@ class InstallProjectCommand extends Command
 
             $this->databaseLink = [$host, $database, $username, $password, $port, $charset, $prefix];
 
-            $this->generateEnvFile($host, $database, $username, $password, $port, $charset, $prefix);
+            $this->generateEnvFile($host, $database, $username, $password, $port, $charset, $prefix, $appDomain);
         }
     }
 
@@ -191,27 +200,28 @@ class InstallProjectCommand extends Command
    */
     protected function migrateAndSeeds(): void
     {
-      foreach (CatchAdmin::getModulesDirectory() as $directory) {
-        $moduleInfo = CatchAdmin::getModuleInfo($directory);
-        if (!empty($moduleInfo) && is_dir(CatchAdmin::moduleMigrationsDirectory($moduleInfo['alias']))) {
-          $output = Console::call('catch-migrate:run', [$moduleInfo['alias']]);
-          $this->output->info(sprintf('module [%s] migrations %s', $moduleInfo['alias'], $output->fetch()));
 
-          $seedOut = Console::call('catch-seed:run', [$moduleInfo['alias']]);
-          $this->output->info(sprintf('module [%s] seeds %s', $moduleInfo['alias'], $seedOut->fetch()));
-        }
+      foreach ($this->defaultModule as $m) {
+          $module = new InstallLocalModule($m);
+          $module->installModuleTables();
+          $module->installModuleSeeds();
+          $this->output->info('🎉 module [' . $m . '] installed successfully');
       }
     }
 
+    /**
+     * 回滚数据
+     *
+     * @time 2020年09月07日
+     * @return void
+     */
     protected function migrateRollback()
     {
-      foreach (CatchAdmin::getModulesDirectory() as $directory) {
-        $moduleInfo = CatchAdmin::getModuleInfo($directory);
-        if (!empty($moduleInfo) && is_dir(CatchAdmin::moduleMigrationsDirectory($moduleInfo['alias']))) {
-              $rollbackOut = Console::call('catch-migrate:rollback', [$moduleInfo['alias'], '-f']);
-              // $this->output->info(sprintf('module [%s] [%s] rollback %s', $moduleInfo['alias'], basename($migration), $rollbackOut->fetch()));
+        foreach ($this->defaultModule as $m) {
+            $module = new InstallLocalModule($m);
+            $module->rollbackModuleTable();
+            $this->output->info('🎉' . $m . ' tables rollback successfully');
         }
-      }
     }
 
     /**
@@ -236,6 +246,8 @@ class InstallProjectCommand extends Command
         // todo something
       // create jwt 
       Console::call('jwt:create');
+      // create service
+      Console::call('catch-service:discover');
     }
 
     /**
@@ -249,13 +261,15 @@ class InstallProjectCommand extends Command
      * @param $port
      * @param $charset
      * @param $prefix
+     * @param $appDomain
      * @return void
      */
-    protected function generateEnvFile($host, $database, $username, $password, $port, $charset, $prefix): void
+    protected function generateEnvFile($host, $database, $username, $password, $port, $charset, $prefix, $appDomain): void
     {
         try {
             $env = \parse_ini_file(root_path() . '.example.env', true);
 
+            $env['APP']['DOMAIN'] = $appDomain;
             $env['DATABASE']['HOSTNAME'] = $host;
             $env['DATABASE']['DATABASE'] = $database;
             $env['DATABASE']['USERNAME'] = $username;
@@ -324,9 +338,10 @@ class InstallProjectCommand extends Command
 | \___/\__,_/\__/\___/_/ /_/  /_/  |_\__,_/_/ /_/ /_/_/_/ /_/  |
 |                                                              |   
  \ __ __ __ __ _ __ _ __ enjoy it ! _ __ __ __ __ __ __ ___ _ @ 2017 ～ %s
- 账号: admin@gmail.com
- 密码: admin                                               
-', $year));
+ 版本: %s
+ 初始账号: catch@admin.com
+ 初始密码: catchadmin                                             
+', $year, CatchAdmin::VERSION));
         exit(0);
     }
 

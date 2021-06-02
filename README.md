@@ -4,7 +4,9 @@
 
 
 <p align="center"><code>CatchAdmin</code>是一款基于<a href="http://www.thinkphp.cn/" target="_blank">thinkphp framework</a>和
-<a href="https://pro.loacg.com/docs/getting-started">ant degisn pro vue</a>二次开发而成的后台管理系统，采用了目前趋势的前后端分离开发模式，后端仅需要提供简洁的 API 数据结构，前端负责呈现数据。目前前端采用数据驱动，大大提高了开发效率。这不仅仅是一个项目，更是后端更新技术栈的一次实践</p>
+<a href="https://github.com/PanJiaChen/vue-element-admin/">element admin</a>开发而成的后台管理系统。因为 thinkphp 的简单高效，文档齐全。在看了很多 thinkphp 生态中的后台管理系统，发现没有一款合适的前后端分离系统。遂开发了 CatchAdmin。
+基于新版 thinkphp6 服务者的特性，后台的每个模块都可以独立成一个服务，模块之间的功能职责更加清晰。同时后台也兼顾了后台开发前端页面，减少了前端页面代码的输出。将表格和表单都封装成了后台组件，可在后台中通过 Json 数据轻松渲染出前端页面，大大提高了开发效率。CatchAdmin 同时也提供 Http 客户端，Excel 的导入导出，敏感词检测，大量的内置 commands 等一系列组件工具，提高使用后台的开发体验。
+</p>
 
 <p align="center">
 <a href="http://doc.catchadmin.com/">文档</a> |
@@ -28,18 +30,64 @@
     <img src="https://svg.hamm.cn/badge.svg?key=License&value=Apache-2.0"/>
 </p >
 
+## 后台启动流程
+[![gSrLz6.png](https://z3.ax1x.com/2021/04/26/gSrLz6.png)](https://imgtu.com/i/gSrLz6)
+## AntDV 版本
+- 请使用 `v1`分支
+
+## 功能
+- [x] `用户管理` 后台用户管理
+- [x] `部门管理` 配置公司的部门结构，支持树形结构
+- [x] `岗位管理` 配置后台用户的职务
+- [x] `菜单管理` 配置系统菜单，按钮等等
+- [x] `角色管理` 配置用户担当的角色，分配权限
+- [x] `数据字典` 管理后台表结构
+- [x] `操作日志` 后台用户操作记录
+- [x] `登录日志` 后台系统用户的登录记录
+- [x] `代码生成` 生成 API 端的 CURD 操作
+- [x] `敏感词`  支持敏感词配置
+- [x] `附件管理` 可管理上传的文件
+- [x] `定时任务` 可管理定时任务，而不依赖于 Crontab
+- [x] `短信平台` 短信云管理，支持 阿里大于，腾讯云，Ucloud，Submail
+- [x] `云上传`  支持云上传，七牛，OSS，腾讯
+- [ ] `微信管理`
+
 ## 项目地址
 - [github 地址](https://github.com/yanwenwu/catch-admin)
 - [gitee 地址](https://gitee.com/jaguarjack/catchAdmin)
 - [前端 Vue 项目地址](https://github.com/yanwenwu/catch-admin-vue)
 - [文档地址](https://github.com/catch-admin/document)[个人精力实在有限,希望可以小伙伴们可以一起维护文档]
 ## 预览
-<p align="center">
-    <img src="https://cdn.learnku.com/uploads/images/202005/17/18206/0ECPy72zUZ.png!large">
-</p>
-<p align="center">
-    <img src="https://cdn.learnku.com/uploads/images/202005/17/18206/ngzSU0A9SI.png!large">
-</p>
+<table>
+    <tr>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucNXq.md.png"></td>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucm6I.md.png"></td>
+    </tr>
+    <tr>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucZpd.md.png"></td>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wuce1A.md.png"></td>
+    </tr>
+    <tr>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucnXt.md.png"></td>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucKnP.md.png"></td>
+    </tr>
+    <tr>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wuc3tg.md.png"></td>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucM0f.md.png"></td>
+    </tr>
+    <tr>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucQ78.md.png"></td>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wuc1AS.md.png"></td>
+    </tr>
+     <tr>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wuc8hQ.md.png"></td>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucY1s.md.png"></td>
+    </tr>
+    <tr>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wucJpj.md.png"></td>
+        <td><img src="https://s1.ax1x.com/2020/09/07/wuctcn.md.png"></td>
+    </tr>
+</table>
 
 ## 环境要求
 - php7.1+ (需以下扩展)
@@ -63,8 +111,7 @@ curl -sS https://install.phpcomposer.com/installer | php
 
 composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/
 
-composer install
-
+composer install --ignore-platform-reqs
 ```
 - composer 安装
 ```shell
@@ -80,17 +127,10 @@ composer create-project jaguarjack/catchadmin:dev-master
 ## 体验地址
 
 [体验地址](http://vue.catchadmin.com)
-- 账号: test@catch.com 
-- 密码: 123456
+- 账号: catch@admin.com
+- 密码: catchadmin
 
 [catchadmin 文档地址](http://doc.catchadmin.com)
-
-[catchadmin 接口文档地址](http://apidoc.catchadmin.com)
-- 账号：test@catch.com
-- 密码：123456
-
-> 请大家不要随意添加数据，因为没有意义，只看 `catchadmin` 的文档就可以了。
-如果有太多脏数据的话，我会关闭该账号。
 
 ### 系列文章
 如果是刚开始使用 thinkphp6, 以下文章可能会对你有些许帮助，文章基于 RC3 版本。整体架构是不变的。
@@ -100,22 +140,25 @@ composer create-project jaguarjack/catchadmin:dev-master
 - [Tp6 中间件分析](https://www.kancloud.cn/akasishikelu/thinkphp6/1136616)
 - [Tp6 请求流程](https://www.kancloud.cn/akasishikelu/thinkphp6/1136608)
 
+### Donate
+如果你觉得项目对你有帮助，可以请作者喝杯咖啡☕️！鼓励下
+<img src="https://cdn.learnku.com/uploads/images/202008/11/18206/e6qAAM8Bod.jpg!large">
+
+### Who used
+- [uctoo 应用开发管理后台](https://gitee.com/uctoo/uctoo)
+
 ### Talking
 - [论坛讨论](http://bbs.catchadmin.com)
 - 可以提 `ISSUE`，请按照 `issue` 模板提问
-- 加入 Q 群 `302266230` 讨论以及反馈一些问题。
-    - 加群需要付费，所以请使用能支持群费的客户端。(不喜勿喷，过滤一部分不看文档和 TP 框架文档并且衣来伸手饭来张口的用户)
-    - 不建议你付费入群，认真阅读文档可以解决所有问题
-    - 更愿意以 `ISSUE` 的方式提问
-    - 付费入群，群里的各位也是没有义务回答各种各样的基础问题。请 GOOGLE。
+- 加入 Q 群 `302266230` 前请先 star 项目支持一下， 备注填写用户名 + 平台。例如： JaguarJack Github
 
 ### Thanks
-> 排名部分先后
+- 感谢 [JetBrains](https://www.jetbrains.com) 提供生产力巨高的 `PHPStorm`和`WebStorm`
+> 排名不分先后
 
 - [top-think/think](https://github.com/top-think/think)
-- [ant-design-pro-vue](https://github.com/sendya/ant-design-pro-vue)
+- [element-admin](https://panjiachen.gitee.io/vue-element-admin-site/zh/)
 - [thans/tp-jwt-auth](https://packagist.org/packages/thans/tp-jwt-auth)
-- [workerman/workerman](https://github.com/walkor/Workerman)
 - [jaguarjack/think-filesystem-cloud](https://github.com/yanwenwu/think-filesystem-cloud)
 - [overtrue/wechat](https://github.com/overtrue/wechat)
 - [jaguarjack/migration-generator](https://github.com/yanwenwu/migration-generator)

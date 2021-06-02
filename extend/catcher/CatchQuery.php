@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 namespace catcher;
 
 use catcher\base\CatchModel;
@@ -11,7 +13,7 @@ class CatchQuery extends Query
   /**
    *
    * @time 2020年01月13日
-   * @param string $model
+   * @param mixed $model
    * @param string $joinField
    * @param string $currentJoinField
    * @param array $field
@@ -19,29 +21,38 @@ class CatchQuery extends Query
    * @param array $bind
    * @return CatchQuery
    */
-    public function catchJoin(string $model, string $joinField, string $currentJoinField, array $field = [], string $type = 'INNER', array $bind = []): CatchQuery
+    public function catchJoin($model, string $joinField, string $currentJoinField, array $field = [], string $type = 'INNER', array $bind = []): CatchQuery
     {
-        $table = app($model)->getTable();
+        $tableAlias = null;
+
+        if (is_string($model)) {
+            $table = app($model)->getTable();
+        } else {
+            list($model, $tableAlias) = $model;
+            $table = app($model)->getTable();
+        }
 
         // 合并字段
-        $this->options['field'] = array_merge($this->options['field'], array_map(function ($value) use ($table) {
-          return $table . '.' . $value;
+        $this->options['field'] = array_merge($this->options['field'] ?? [], array_map(function ($value) use ($table, $tableAlias) {
+          return ($tableAlias ? : $table) . '.' . $value;
         }, $field));
 
-        return $this->join($table, sprintf('%s.%s=%s.%s', $table, $joinField, $this->getAlias(), $currentJoinField), $type, $bind);
+        return $this->join($tableAlias ? sprintf('%s %s', $table, $tableAlias) : $table
+
+            , sprintf('%s.%s=%s.%s', $tableAlias ? $tableAlias : $table, $joinField, $this->getAlias(), $currentJoinField), $type, $bind);
     }
 
   /**
    *
    * @time 2020年01月13日
-   * @param string $model
+   * @param mixed $model
    * @param string $joinField
    * @param string $currentJoinField
    * @param array $field
    * @param array $bind
    * @return CatchQuery
    */
-    public function catchLeftJoin(string $model, string $joinField, string $currentJoinField, array $field = [], array $bind = []): CatchQuery
+    public function catchLeftJoin($model, string $joinField, string $currentJoinField, array $field = [], array $bind = []): CatchQuery
     {
         return $this->catchJoin($model, $joinField,  $currentJoinField,  $field,'LEFT', $bind);
     }
@@ -49,14 +60,14 @@ class CatchQuery extends Query
   /**
    *
    * @time 2020年01月13日
-   * @param string $model
+   * @param mixed $model
    * @param string $joinField
    * @param string $currentJoinField
    * @param array $field
    * @param array $bind
    * @return CatchQuery
    */
-    public function catchRightJoin(string $model, string $joinField, string $currentJoinField, array $field = [], array $bind = []): CatchQuery
+    public function catchRightJoin($model, string $joinField, string $currentJoinField, array $field = [], array $bind = []): CatchQuery
     {
         return $this->catchJoin($model, $joinField,  $currentJoinField, $field,'RIGHT', $bind);
     }
@@ -118,8 +129,63 @@ class CatchQuery extends Query
 
         foreach ($params as $field => $value) {
             $method = 'search' . Str::studly($field) . 'Attr';
-            if (method_exists($this->model, $method)) {
-                $this->model->$method($this, $value ?? null, $params);
+            // value in [null, '']
+            if ($value !== null && $value !== '' && method_exists($this->model, $method)) {
+                $this->model->$method($this, $value, $params);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * 快速搜索
+     *
+     * @param array $params
+     * @return Query
+     */
+    public function quickSearch($params = []): Query
+    {
+        $requestParams = \request()->param();
+
+        if (empty($params) && empty($requestParams)) {
+            return $this;
+        }
+
+        foreach ($requestParams as $field => $value) {
+            if (isset($params[$field])) {
+                // ['>', value] || value
+                if (is_array($params[$field])) {
+                    $this->where($field, $params[$field][0], $params[$field][1]);
+                } else {
+                    $this->where($field, $value);
+                }
+            } else {
+                // 区间范围 start_数据库字段 & end_数据库字段
+                $startPos = strpos($field, 'start_');
+                if ($startPos === 0) {
+                    $this->where(str_replace('start_','', $field), '>=', strtotime($value));
+                }
+                $endPos = strpos($field, 'end_');
+                if ($endPos === 0) {
+                    $this->where(str_replace('end_', '', $field), '<=', strtotime($value));
+                }
+                // 模糊搜索
+                if (Str::contains($field, 'like')) {
+                    [$operate, $field] = explode('_', $field);
+                    if ($operate === 'like') {
+                        $this->whereLike($field, $value);
+                    } else if ($operate === '%like') {
+                        $this->whereLeftLike($field, $value);
+                    } else {
+                        $this->whereRightLike($field, $value);
+                    }
+                }
+
+                // = 值搜索
+                if ($value || is_numeric($value)) {
+                    $this->where($field, $value);
+                }
             }
         }
 
@@ -159,18 +225,50 @@ class CatchQuery extends Query
               $condition .= '%';
         }
 
-        return parent::whereLike($this->getAlias() . '.' . $field, $condition, $logic);
+        if (strpos($field, '.') === false) {
+            $field = $this->getAlias() . '.' . $field;
+        }
+
+        return parent::whereLike($field, $condition, $logic);
+    }
+
+    /**
+     * @param string $field
+     * @param $condition
+     * @param string $logic
+     * @return Query
+     */
+    public function whereLeftLike(string $field, $condition, string $logic = 'AND'): Query
+    {
+        return $this->where($field, $condition, $logic, 'left');
+    }
+
+    /**
+     * @param string $field
+     * @param $condition
+     * @param string $logic
+     * @return Query
+     */
+    public function whereRightLike(string $field, $condition, string $logic = 'AND'): Query
+    {
+        return $this->where($field, $condition, $logic, 'right');
     }
 
   /**
    * 额外的字段
    *
    * @time 2020年01月13日
-   * @param array $fields
+   * @param $fields
    * @return CatchQuery
    */
-    public function addFields(array $fields): CatchQuery
+    public function addFields($fields): CatchQuery
     {
+        if (is_string($fields)) {
+            $this->options['field'][] = $fields;
+
+            return $this;
+        }
+
         $this->options['field'] = array_merge($this->options['field'], $fields);
 
         return $this;
@@ -201,8 +299,55 @@ class CatchQuery extends Query
             $this->order($this->getTable() . '.sort', $order);
         }
 
+        if (in_array('weight', array_keys($this->getFields()))) {
+            $this->order($this->getTable() . '.weight', $order);
+        }
+
         $this->order($this->getTable() . '.' . $this->getPk(), $order);
 
         return $this;
+    }
+
+    /**
+     * 新增 Select 子查询
+     *
+     * @time 2020年06月17日
+     * @param callable $callable
+     * @param string $as
+     * @return $this
+     */
+    public function  addSelectSub(callable $callable, string $as)
+    {
+        $this->field(sprintf('%s as %s', $callable()->buildSql(), $as));
+
+        return $this;
+    }
+
+    /**
+     * 字段增加
+     *
+     * @time 2020年11月04日
+     * @param $field
+     * @param int $amount
+     * @throws \think\db\exception\DbException
+     * @return int
+     */
+    public function increment($field, $amount = 1)
+    {
+        return $this->inc($field, $amount)->update();
+    }
+
+    /**
+     * 字段减少
+     *
+     * @time 2020年11月04日
+     * @param $field
+     * @param int $amount
+     * @throws \think\db\exception\DbException
+     * @return int
+     */
+    public function decrement($field, $amount = 1)
+    {
+        return $this->dec($field, $amount)->update();
     }
 }

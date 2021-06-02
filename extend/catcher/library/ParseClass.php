@@ -1,6 +1,10 @@
 <?php
+
+declare(strict_types=1);
+
 namespace catcher\library;
 
+use think\exception\ClassNotFoundException;
 
 class ParseClass
 {
@@ -14,6 +18,7 @@ class ParseClass
      * 获取父类方法
      *
      * @return array
+     * @throws \ReflectionException
      */
     public function parentMethods()
     {
@@ -36,6 +41,7 @@ class ParseClass
      * 获取所有方法
      *
      * @return array
+     * @throws \ReflectionException
      */
     public function methods()
     {
@@ -55,6 +61,7 @@ class ParseClass
 
     /**
      * @return mixed
+     * @throws \ReflectionException
      */
     public function onlySelfMethods()
     {
@@ -71,18 +78,23 @@ class ParseClass
        return  $methods;
     }
 
+
     /**
-     * 获取 CLASS
+     * 获取class
      *
-     * @return \ReflectionClass
+     * @time 2020年09月06日
      * @throws \ReflectionException
+     * @return \ReflectionClass
      */
     public function getClass()
     {
+        $class = $this->namespace . $this->module . '\\controller\\'. ucfirst($this->controller);
 
-        return new \ReflectionClass($this->namespace . $this->module . '\\controller\\'.
+        if (class_exists($class)) {
+            return new \ReflectionClass($class);
+        }
 
-          ucfirst($this->controller));
+        throw new ClassNotFoundException($this->controller . ' not found');
     }
 
     /**
@@ -103,9 +115,7 @@ class ParseClass
      */
     public function setModule($module)
     {
-        $composer = \json_decode(file_get_contents(root_path() . 'composer.json'), true);
-
-        $psr4 = $composer['autoload']['psr-4'];
+        $psr4 = (new Composer())->psr4Autoload();
 
         foreach ($psr4 as $key => $_module) {
             if ($_module == $module) {

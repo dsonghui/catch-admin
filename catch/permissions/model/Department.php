@@ -3,6 +3,7 @@ namespace catchAdmin\permissions\model;
 
 use catchAdmin\permissions\model\search\DepartmentSearch;
 use catcher\base\CatchModel;
+use think\db\exception\DbException;
 
 class Department extends CatchModel
 {
@@ -25,20 +26,38 @@ class Department extends CatchModel
 			'deleted_at', // 删除状态，null 未删除 timestamp 已删除
     ];
 
-  /**
+    protected $updateChildrenFields = 'status';
+
+    /**
    * 列表数据
    *
    * @time 2020年01月09日
-   * @param $params
    * @return array
-   * @throws \think\db\exception\DbException
+   * @throws DbException
    */
     public function getList(): array
     {
-        return $this->withoutField(['department_name'])
-                    ->addFields(['department_name as title'])
-                    ->catchSearch()
+        return $this->catchSearch()
                     ->catchOrder()
-                    ->select()->toArray();
+                    ->select()->toTree();
+    }
+
+    /**
+     * 获取子部门IDS
+     *
+     * @time 2020年11月04日
+     * @param $id
+     * @throws DbException
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\ModelNotFoundException
+     * @return mixed
+     */
+    public static function getChildrenDepartmentIds($id)
+    {
+        $departmentIds = Department::field(['id', 'parent_id'])->select()->getAllChildrenIds([$id]);
+
+        $departmentIds[] = $id;
+
+        return $departmentIds;
     }
 }

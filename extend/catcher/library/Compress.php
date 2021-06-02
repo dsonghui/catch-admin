@@ -1,16 +1,20 @@
 <?php
+declare(strict_types=1);
+
 namespace catcher\library;
 
 use catcher\CatchAdmin;
 use catcher\exceptions\FailedException;
 use catcher\facade\Http;
-use GuzzleHttp\Client;
-use GuzzleHttp\TransferStats;
-use Psr\Http\Message\ResponseInterface;
 use function GuzzleHttp\Psr7\stream_for;
+use catcher\facade\FileSystem;
 
 class Compress
 {
+    protected $savePath;
+
+    protected $zip;
+
     public function __construct()
     {
         if (!extension_loaded('zip')) {
@@ -25,44 +29,34 @@ class Compress
      * @param $moduleName
      * @param string $zipPath
      * @return bool
+     * @throws \Exception
      */
-    public function moduleToZip($moduleName, $zipPath = '')
+    public function moduleToZip(string $moduleName, string $zipPath = '')
     {
         if (!is_dir(CatchAdmin::directory() . $moduleName)) {
             throw new FailedException(sprintf('module 【%s】not found~', $moduleName));
         }
 
-        // 获取模块内的所有文件
-        $files = $this->getFilesFromDir(CatchAdmin::directory() . $moduleName);
-
-        $packageZip = new \ZipArchive();
-        // zip 打包位置 默认打包在 catch 目录下
-        $zipPath = $zipPath ? : CatchAdmin::directory() . $moduleName . '.zip';
-        $packageZip->open($zipPath, \ZipArchive::CREATE);
-        $packageZip->addEmptyDir($moduleName);
-        foreach ($files as $file) {
-            $baseName = basename($file);
-            $localName = str_replace([CatchAdmin::directory(), $baseName], ['', ''], $file);
-            $packageZip->addFile($file, $localName . $baseName);
-        }
-        $packageZip->close();
+        (new Zip())->make($zipPath ? : CatchAdmin::directory() . $moduleName . '.zip', \ZipArchive::CREATE)
+                   ->folder($moduleName)
+                   ->addFiles(FileSystem::allFiles(CatchAdmin::moduleDirectory($moduleName)))
+                   ->close();
 
         return true;
     }
+
 
     /**
      * download zip
      *
      * @time 2020年04月30日
      * @param $remotePackageUrl
-     * @param $moduleName
      * @return string
      */
-    public function download($moduleName, $remotePackageUrl = '')
+    public function download($remotePackageUrl = '')
     {
-        $response = Http::timeout(5)
-                    ->options([
-                        'save_to' => stream_for(fopen(CatchAdmin::directory() . $moduleName .'.zip', 'w+'))
+        $response = Http::options([
+                       'save_to' => stream_for(fopen($this->savePath, 'w+'))
                     ])
                     ->get($remotePackageUrl);
 
@@ -74,19 +68,26 @@ class Compress
      *
      * @time 2020年04月30日
      * @param $moduleName
-     * @return void
+     * @return bool
      */
     public function update($moduleName)
     {
-        $moduleZip = $this->download($moduleName);
         // 备份
         $backupPath = $this->backup($moduleName);
         try {
-            $this->moduleUnzip($moduleName, $moduleZip);
+            $this->moduleUnzip($moduleName, $this->savePath);
         } catch (\Exception $exception) {
+            // 更新失败先删除原目录
+            FileSystem::deleteDirectory(CatchAdmin::moduleDirectory($moduleName));
+            // 解压备份文件
             $this->moduleUnzip($moduleName, $backupPath);
-            $this->rmDir($this->getModuleBackupPath($moduleName));
+            // 删除备份文件
+            FileSystem::delete($backupPath);
+            return false;
         }
+        // 删除备份文件
+        FileSystem::delete($backupPath);
+        return true;
     }
 
     /**
@@ -96,52 +97,18 @@ class Compress
      * @param $moduleName
      * @param $zipPath
      * @return bool
+     * @throws \Exception
      */
     public function moduleUnzip($moduleName, $zipPath)
     {
-        $zip = new \ZipArchive();
-
-        // 创建解压包的临时目录
-        $tempExtractToPath = runtime_path('module' . DIRECTORY_SEPARATOR . date('YmdHis'));
-        CatchAdmin::makeDirectory($tempExtractToPath);
-        // 下载 zip 包
-        $res = $zip->open($zipPath);
-
-        if ($res === true) {
-            $zip->extractTo($tempExtractToPath);
-            $zip->close();
-            $this->copyFileToModule($tempExtractToPath, $moduleName, $tempExtractToPath);
-            // 删除临时文件夹
-            $this->rmDir($tempExtractToPath);
+        try {
+            (new Zip())->make($zipPath)->extractTo(CatchAdmin::moduleDirectory($moduleName) . $moduleName)->close();
             return true;
+        } catch (\Exception $e) {
+            throw new FailedException('更新失败');
         }
-
-        throw new FailedException('更新失败');
     }
 
-    /**
-     * get files from dir
-     *
-     * @time 2019年12月16日
-     * @param $packageDir
-     * @return array
-     */
-    protected function getFilesFromDir($packageDir): array
-    {
-        $files = [];
-
-        $fileSystemIterator = new \FilesystemIterator($packageDir);
-
-        foreach ($fileSystemIterator as $fileSystem) {
-            if ($fileSystem->isDir()) {
-                $files = array_merge($this->getFilesFromDir($fileSystem->getPathName()), $files);
-            } else {
-                $files[] = $fileSystem->getPathName();
-            }
-        }
-
-        return $files;
-    }
 
     /**
      * 删除目录
@@ -150,7 +117,7 @@ class Compress
      * @param $packageDir
      * @return void
      */
-    protected function rmDir($packageDir)
+    public function rmDir($packageDir)
     {
         $fileSystemIterator = new \FilesystemIterator($packageDir);
         try {
@@ -209,7 +176,6 @@ class Compress
      */
     protected function backup($moduleName)
     {
-
         $backup = $this->getModuleBackupPath($moduleName);
 
         CatchAdmin::makeDirectory($backup);
@@ -229,5 +195,20 @@ class Compress
     protected function getModuleBackupPath($moduleName)
     {
         return $backup = runtime_path('module' . DIRECTORY_SEPARATOR . 'backup_'.$moduleName);
+    }
+
+    /**
+     * 保存地址
+     *
+     * @param $path
+     * @return $this
+     * @author JaguarJack <njphper@gmail.com>
+     * @date 2020/7/11
+     */
+    public function savePath($path)
+    {
+        $this->savePath = $path;
+
+        return $this;
     }
 }
